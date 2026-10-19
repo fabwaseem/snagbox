@@ -5,6 +5,7 @@ import type { Request } from "express";
 import { AppConfigService } from "../config/app-config.service";
 import { IS_PUBLIC_KEY } from "../common/decorators/public.decorator";
 import { ApiException, ErrorCode } from "../common/errors";
+import { isLivenessRequest } from "../health/health-probe";
 import { ApiKeyService, ValidatedKey } from "./api-key.service";
 
 export type AuthedRequest = Request & { apiKey?: ValidatedKey };
@@ -41,6 +42,9 @@ export class ApiKeyGuard implements CanActivate {
     ]);
 
     const request = context.switchToHttp().getRequest<AuthedRequest>();
+
+    // Liveness is polled by the proxy with no credentials and must not touch the database.
+    if (isLivenessRequest(request.originalUrl || request.url)) return true;
 
     // 1. Explicit API key — validated even on public routes so per-key
     //    attribution and limits still apply to keyed clients.

@@ -16,7 +16,7 @@
     "build": "pnpm --filter @snagbox/shared build && prisma generate && nest build",
     "dev": "nest start --watch",
     "start": "nest start",
-    "start:prod": "node dist/main",
+    "start:prod": "exec node dist/main",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "pnpm --filter @snagbox/shared build && prisma generate && tsc -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",

@@ -9,6 +9,7 @@ import { AppModule } from "./app.module";
 import { createLogger, PinoNestLogger } from "./logging/pino-logger";
 import { AUTH, type Auth } from "./auth/auth.instance";
 import { AppConfigService } from "./config/app-config.service";
+import { installGracefulShutdown } from "./lifecycle/graceful-shutdown";
 
 async function bootstrap(): Promise<void> {
   // Nest's own body parser is disabled: Better Auth must read the raw request
@@ -36,7 +37,7 @@ async function bootstrap(): Promise<void> {
     return jsonParser(req, res, next);
   });
 
-  app.enableShutdownHooks();
+  installGracefulShutdown(app);
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: "cross-origin" },

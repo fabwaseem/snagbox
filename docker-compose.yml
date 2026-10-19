@@ -21,6 +21,13 @@ services:
       # R2_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       # R2_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       # R2_BUCKET: downloads
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3001/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
     depends_on:
       postgres:
         condition: service_healthy

@@ -61,4 +61,5 @@ ENV NODE_ENV=production \
   FFMPEG_PATH=/usr/bin/ffmpeg \
   YTDLP_VERSION=2026.08.19
 EXPOSE 3001
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/main"]
+# exec replaces the shell so node is PID 1 and receives SIGTERM on rollout.
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && exec node dist/main"]

@@ -220,9 +220,9 @@ docker compose --profile minio up --build
 
 With MinIO, set `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`, then point Snagbox at the bucket with `STORAGE_DRIVER=r2` and `R2_ENDPOINT=http://minio:9000`.
 
-**Railway.** Use the button at the top. The service health check is `GET /v2/health` (`railway.toml`). Set `DATABASE_URL`, `BETTER_AUTH_SECRET`, and unset `AUTH_DISABLED` on any deploy that is not only yours.
+**Railway.** Use the button at the top. The service health check is `GET /api/health` (`railway.toml`). `GET /v2/health` is the deeper engine check. Set `DATABASE_URL`, `BETTER_AUTH_SECRET`, and unset `AUTH_DISABLED` on any deploy that is not only yours.
 
-**Elsewhere.** `pnpm install`, `pnpm prisma:deploy`, `pnpm build`, `pnpm start:prod`. On a read-only filesystem set `YTDLP_PATH` and `FFMPEG_PATH`.
+**Elsewhere.** `pnpm install`, `pnpm prisma:deploy`, `pnpm build`, `node dist/main`. On a read-only filesystem set `YTDLP_PATH` and `FFMPEG_PATH`.
 
 Published images:
 

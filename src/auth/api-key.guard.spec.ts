@@ -13,8 +13,14 @@ class Routes {
   locked(): void {}
 }
 
-function httpContext(handler: () => void, headers: Record<string, string>): ExecutionContext {
+function httpContext(
+  handler: () => void,
+  headers: Record<string, string>,
+  url = "/v2/downloads",
+): ExecutionContext {
   const request = {
+    url,
+    originalUrl: url,
     header(name: string) {
       return headers[name.toLowerCase()];
     },
@@ -108,6 +114,20 @@ describe("ApiKeyGuard", () => {
     await expect(
       guard.canActivate(httpContext(Routes.prototype.locked, { "x-api-key": "sb_good" })),
     ).rejects.toBeInstanceOf(HttpException);
+  });
+
+  it("skips auth and key lookup for the liveness probe", async () => {
+    const validate = jest.fn().mockResolvedValue(null);
+    const guard = guardFor({ isProduction: true, authDisabled: false, frontendSecret: "proxy-secret" }, {
+      validate,
+    });
+    await expect(
+      guard.canActivate(httpContext(Routes.prototype.locked, { "x-api-key": "sb_bad" }, "/api/health")),
+    ).resolves.toBe(true);
+    await expect(
+      guard.canActivate(httpContext(Routes.prototype.locked, {}, "/api/health?ready=1")),
+    ).resolves.toBe(true);
+    expect(validate).not.toHaveBeenCalled();
   });
 
   it("allows public routes and the frontend secret without a key", async () => {
