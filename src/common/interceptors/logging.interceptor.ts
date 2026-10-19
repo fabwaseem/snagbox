@@ -8,6 +8,7 @@ import {
 import type { Request, Response } from "express";
 import { Observable } from "rxjs";
 import { tap } from "rxjs/operators";
+import { isLivenessRequest } from "../../health/health-probe";
 import { MetricsService } from "../../metrics/metrics.service";
 
 @Injectable()
@@ -19,6 +20,7 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
+    if (isLivenessRequest(req.originalUrl || req.url)) return next.handle();
     const started = Date.now();
 
     return next.handle().pipe(

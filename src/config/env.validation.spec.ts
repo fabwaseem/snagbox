@@ -14,6 +14,15 @@ describe("env schema auth flag", () => {
     );
   });
 
+  it("defaults the shutdown drain and rejects an oversized window", () => {
+    expect(envSchema.parse(base).SHUTDOWN_DRAIN_MS).toBe(9_000);
+    expect(envSchema.parse({ ...base, SHUTDOWN_DRAIN_MS: "" }).SHUTDOWN_DRAIN_MS).toBe(9_000);
+    expect(envSchema.parse({ ...base, SHUTDOWN_DRAIN_MS: "1500" }).SHUTDOWN_DRAIN_MS).toBe(1_500);
+    expect(() => envSchema.parse({ ...base, SHUTDOWN_DRAIN_MS: "30000" })).toThrow(
+      /SHUTDOWN_DRAIN_MS/,
+    );
+  });
+
   it("defaults the direct-download ceiling", () => {
     const env = envSchema.parse(base);
     expect(env.DIRECT_DOWNLOAD_TIMEOUT_MS).toBe(300_000);

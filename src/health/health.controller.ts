@@ -1,4 +1,4 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Header, ServiceUnavailableException } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { SkipThrottle } from "@nestjs/throttler";
 import { Public } from "../common/decorators/public.decorator";
@@ -7,6 +7,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { StorageQuotaService } from "../storage/storage-quota.service";
 import { RedisService } from "../redis/redis.service";
+import { isDraining } from "./health-probe";
 
 @ApiTags("Health")
 @Controller({ path: "health", version: "2" })
@@ -24,8 +25,13 @@ export class HealthController {
   @Public()
   @SkipThrottle()
   @Get()
+  @Header("Cache-Control", "no-store")
   @ApiOperation({ summary: "Service health, engine and database status" })
   async check() {
+    if (isDraining()) {
+      throw new ServiceUnavailableException({ status: "draining" });
+    }
+
     let database = false;
     try {
       await this.prisma.$queryRaw`SELECT 1`;

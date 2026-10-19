@@ -10,6 +10,15 @@ const booleanish = (defaultValue: "true" | "false") =>
 export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3001),
+  /**
+   * How long to keep accepting traffic after SIGTERM/SIGINT before the
+   * listener closes. Probes return 503 during this window. The process
+   * force-exits 25s after the signal regardless. Empty uses 9000.
+   */
+  SHUTDOWN_DRAIN_MS: z.preprocess((value) => {
+    if (value === undefined || value === "") return 9_000;
+    return value;
+  }, z.coerce.number().int().min(0).max(20_000)),
   // No default: a silently-wrong connection string is worse than a boot failure.
   DATABASE_URL: z.string().min(1),
   ALLOWED_ORIGINS: z.string().optional().default(""),
