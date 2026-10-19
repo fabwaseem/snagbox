@@ -7,6 +7,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { StorageQuotaService } from "../storage/storage-quota.service";
 import { RedisService } from "../redis/redis.service";
+import { YTDLP_VERSION_UNKNOWN } from "../engine/version-cache";
 import { isDraining } from "./health-probe";
 
 @ApiTags("Health")
@@ -40,6 +41,7 @@ export class HealthController {
       database = false;
     }
 
+    // versions() never waits on yt-dlp. A probe still in flight is "unknown".
     const engine = await this.binaries.versions();
 
     // Surfaced so the bucket's headroom is observable without opening a
@@ -59,7 +61,7 @@ export class HealthController {
       service: "snagbox",
       redis,
       storage,
-      status: database && engine.ytdlp ? "ok" : "degraded",
+      status: database && engine.ytdlp && engine.ytdlp !== YTDLP_VERSION_UNKNOWN ? "ok" : "degraded",
       uptimeSeconds: Math.round((Date.now() - this.startedAt) / 1000),
       database,
       engine: {

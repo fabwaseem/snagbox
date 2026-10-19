@@ -12,6 +12,7 @@ import { StorageService } from "../storage/storage.service";
 import { cookieDigest, looksLikeCookieJar } from "./binaries/cookies";
 import { downloadVerifiedFile } from "./binaries/download";
 import { pinnedChecksum, resolveYtdlpVersion, standaloneAssetName, ytdlpAssetUrl } from "./binaries/release";
+import { VersionCache, YTDLP_VERSION_UNKNOWN } from "./version-cache";
 
 export { looksLikeCookieJar } from "./binaries/cookies";
 export { PINNED_YTDLP_VERSION } from "./binaries/release";
@@ -81,6 +82,8 @@ export class BinariesService implements OnModuleInit {
   private lastError: string | null = null;
   private lastAttemptAt = 0;
   private static readonly RETRY_COOLDOWN_MS = 30_000;
+  /** One shared --version probe. Health reads it and never waits on a spawn. */
+  private readonly versionCache = new VersionCache(() => this.probeVersion());
 
   constructor(
     private readonly config: AppConfigService,
@@ -158,6 +161,16 @@ export class BinariesService implements OnModuleInit {
     await this.setupPromise;
   }
 
+  /**
+   * Engine snapshot for /v2/health.
+   *
+   * The yt-dlp version is whatever was captured at boot (or the last refresh).
+   * A missing or stale value starts at most one background `--version`; this
+   * method does not wait for it. While that probe is the first one, the
+   * version is `"unknown"`. Nothing else on the health or status routes
+   * spawns a process per request — liveness is a flag read, metrics are
+   * in-process counters, and admin stats are database counts.
+   */
   async versions(): Promise<{
     ytdlp: string | null;
     ytdlpSource: string | null;
@@ -166,16 +179,14 @@ export class BinariesService implements OnModuleInit {
     jsRuntime: string | null;
     error: string | null;
   }> {
-    let version: string | null = null;
-    if (this.invocation) {
-      try {
-        version = (await this.runYtdlp(["--version"])).trim();
-      } catch {
-        version = null;
-      }
-    }
+    if (this.invocation) this.versionCache.refresh();
+    // Boot's own --version is the single probe. Until it finishes, say so
+    // without starting another one.
+    const cached = this.versionCache.current();
+    const ytdlp =
+      cached ?? (this.setupPromise || this.versionCache.inFlight ? YTDLP_VERSION_UNKNOWN : null);
     return {
-      ytdlp: version,
+      ytdlp,
       ytdlpSource: this.invocation?.source ?? null,
       pluginDir: this.pluginDir || null,
       ffmpeg: Boolean(this._ffmpegPath),
@@ -197,6 +208,14 @@ export class BinariesService implements OnModuleInit {
   }
 
   async updateYtdlp(): Promise<string> {
+    const output = await this.runUpdate();
+    // The binary changed. One background probe picks up the new version;
+    // callers keep the previous string until it lands.
+    this.versionCache.refresh(true);
+    return output;
+  }
+
+  private async runUpdate(): Promise<string> {
     const inv = this.ytdlp;
     if (inv.source === "managed-binary" || inv.source === "env") {
       return (await this.runYtdlp(["-U"])).trim();
@@ -215,6 +234,17 @@ export class BinariesService implements OnModuleInit {
       return "re-downloaded latest zipimport build";
     }
     return "system-managed installation — update it through your package manager";
+  }
+
+  /** Background `--version`. Failures leave the previous cache in place. */
+  private async probeVersion(): Promise<string | null> {
+    if (!this.invocation) return null;
+    try {
+      const version = (await this.runYtdlp(["--version"])).trim();
+      return version || null;
+    } catch {
+      return null;
+    }
   }
 
   private async runYtdlp(args: string[]): Promise<string> {
@@ -250,7 +280,12 @@ export class BinariesService implements OnModuleInit {
         timeout: 20_000,
         windowsHide: true,
       });
-      return /^\d{4}\.\d{2}/.test(stdout.trim());
+      const version = stdout.trim();
+      if (!/^\d{4}\.\d{2}/.test(version)) return false;
+      // Boot already ran --version to accept this binary. Remember it so the
+      // first health checks do not spawn another process.
+      this.versionCache.remember(version);
+      return true;
     } catch {
       return false;
     }

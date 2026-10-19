@@ -11,6 +11,7 @@ import {
 import { NestFactory } from "@nestjs/core";
 import { LivenessController } from "../src/health/liveness.controller";
 import { installGracefulShutdown } from "../src/lifecycle/graceful-shutdown";
+import { createLogger, PinoNestLogger } from "../src/logging/pino-logger";
 
 @Controller({ version: VERSION_NEUTRAL })
 class SlowController {
@@ -40,7 +41,8 @@ class MarkClosed implements OnApplicationShutdown {
 class HarnessModule {}
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(HarnessModule, { logger: false });
+  const app = await NestFactory.create(HarnessModule, { bufferLogs: true });
+  app.useLogger(new PinoNestLogger(createLogger("info")));
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: "2" });
   installGracefulShutdown(app);
   await app.listen(0, "127.0.0.1");
